@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com)
-[![Tests](https://img.shields.io/badge/tests-8%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-15%20passed-brightgreen.svg)]()
 [![Market: B3](https://img.shields.io/badge/market-B3%20%7C%20Brazil-green.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -46,6 +46,14 @@ $$DF(t) = \frac{1}{(1 + R_{\text{DI}})^{DU/252}}$$
 Estimates time-varying volatility clustering on Brazilian indices:
 
 $$\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2, \quad \text{with } \alpha + \beta < 1$$
+
+### 4. Onshore Dollar Coupon (Cupom Cambial) & FRC Forwards
+Covered interest parity for B3 USD/BRL futures (DOL/WDO) on the DU-252 basis:
+
+$$F = S \cdot \frac{(1 + R_{\text{DI}})^{DU/252}}{(1 + cc)^{DU/252}} \quad \Rightarrow \quad cc = \left(\frac{S}{F}(1 + R_{\text{DI}})^{DU/252}\right)^{252/DU} - 1$$
+
+- Cupom *limpo* uses same-day spot; cupom *sujo* uses lagged PTAX (same formula, different spot input).
+- FRC (FRA de cupom) between expiries: $(1 + cc_2)^{T_2} = (1 + cc_1)^{T_1}(1 + fwd)^{T_2-T_1}$.
 
 ---
 

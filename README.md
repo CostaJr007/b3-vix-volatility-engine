@@ -8,7 +8,7 @@
 
 **Volatility Modeling, VIXBOVA Index Replication, and DI1 Yield Curve Engine for Brazilian Equities (B3).**
 
-This repository modernizes legacy options and volatility tracking workbooks (`excel_legacy/b3_vixbova_volatility_engine_legacy.xlsm`) into a modular Python engine tailored to the Brazilian market's unique conventions:
+This repository modernizes legacy options and volatility tracking workbooks (see `excel_legacy/README.md` for provenance) into a modular Python engine tailored to the Brazilian market's unique conventions:
 - **DU-252 Business Day Calendar Basis** (vs 365 calendar days).
 - **DI1 Yield Curve Discounting** ($DF = (1 + R_{\text{DI}})^{-DU/252}$).
 - **CBOE VIX Replication on BOVA11 Options** (Discrete variance swap strip).
@@ -94,7 +94,7 @@ b3-vix serve --port 8000
 ---
 
 ## 🗄️ Legacy VBA Archive (`vba_legacy/`)
-Audited source code extracted from `OBT_VIX_MOVE.25.05.xlsm`:
+Audited source code extracted from the legacy volatility workbook (see `excel_legacy/README.md` for provenance):
 - `BlackScholes_NewtonRaphson.bas`: European option pricing & Newton-Raphson IV solver.
 - `RTD_Formula_Manager.bas`: Dynamic formula rewriting for Nelogica, Tryd, and Fast Trade.
 - `Market_Recorder_AxesScaler.bas`: Dynamic chart axis scaling for `VIXBOVA` and `GFMOVE`.

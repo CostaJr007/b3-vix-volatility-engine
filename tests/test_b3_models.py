@@ -5,7 +5,7 @@ import math
 import numpy as np
 from b3_vix.models.black_scholes import B3BlackScholesEngine
 from b3_vix.models.implied_vol import ImpliedVolatilitySolver
-from b3_vix.models.vix_bova import VixBovaEngine
+from b3_vix.models.vix_bova import VixBovaEngine, business_days_to_time_to_expiry
 from b3_vix.models.di_curve import DICurveInterpolator
 from b3_vix.models.garch import GarchVolatilityModel
 from b3_vix.connectors.market_data import B3MarketData
@@ -51,8 +51,15 @@ def test_vixbova_index_calculation():
     next_chain = B3MarketData.generate_bova11_chain(112.50, du_to_expiry=35)
     r = math.log(1.105)
 
-    v1 = VixBovaEngine.compute_single_term_variance(near_chain, time_to_exp=15 / 252.0, r=r)
-    v2 = VixBovaEngine.compute_single_term_variance(next_chain, time_to_exp=35 / 252.0, r=r)
+    # CBOE calendar base (unified): T = calendar_days/365, N30 = 30/365.
+    # Inputs are in DU, so convert explicitly:
+    # calendar_days ~= DU * 365/252, then T = calendar_days/365
+    # (numerically == DU/252, but expressed in calendar units).
+    # NOTE: the synthetic chain itself is priced with DU/252 Black-Scholes
+    # discounting (correct for B3); only the VIX variance/interpolation leg
+    # uses the calendar base.
+    v1 = VixBovaEngine.compute_single_term_variance(near_chain, time_to_exp=business_days_to_time_to_expiry(15), r=r)
+    v2 = VixBovaEngine.compute_single_term_variance(next_chain, time_to_exp=business_days_to_time_to_expiry(35), r=r)
     vix = VixBovaEngine.calculate_vixbova(v1, v2)
 
     assert 10.0 < vix < 100.0

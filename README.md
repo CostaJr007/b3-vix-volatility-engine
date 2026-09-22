@@ -6,9 +6,9 @@
 [![Market: B3](https://img.shields.io/badge/market-B3%20%7C%20Brazil-green.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Institutional Volatility Modeling, VIXBOVA Index Replication, and DI1 Yield Curve Engine for Brazilian Equities (B3).**
+**Volatility Modeling, VIXBOVA Index Replication, and DI1 Yield Curve Engine for Brazilian Equities (B3).**
 
-This repository modernizes institutional options and volatility tracking spreadsheets (`OBT_VIX_MOVE`) into a cloud-native Python engine tailored to the Brazilian market's unique conventions:
+This repository modernizes legacy options and volatility tracking workbooks (`excel_legacy/b3_vixbova_volatility_engine_legacy.xlsm`) into a modular Python engine tailored to the Brazilian market's unique conventions:
 - **DU-252 Business Day Calendar Basis** (vs 365 calendar days).
 - **DI1 Yield Curve Discounting** ($DF = (1 + R_{\text{DI}})^{-DU/252}$).
 - **CBOE VIX Replication on BOVA11 Options** (Discrete variance swap strip).
@@ -77,7 +77,7 @@ b3-vix vixbova --spot 112.50 --near-du 15 --next-du 35 --rate 0.105
 b3-vix rtd --platform profitchart --ticker BOVA11
 b3-vix rtd --platform tryd --ticker WDOM22
 
-# Launch FastAPI REST microservice
+# Launch FastAPI REST service
 b3-vix serve --port 8000
 ```
 

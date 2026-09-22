@@ -9,7 +9,7 @@ import pandas as pd
 
 from ..models.black_scholes import B3BlackScholesEngine
 from ..models.implied_vol import ImpliedVolatilitySolver
-from ..models.vix_bova import VixBovaEngine
+from ..models.vix_bova import VixBovaEngine, business_days_to_time_to_expiry
 from ..models.garch import GarchVolatilityModel
 from ..models.di_curve import DICurveInterpolator
 from ..connectors.rtd_feed import RTDDeskBridge
@@ -35,8 +35,19 @@ class B3GreeksRequest(BaseModel):
 class VixBovaRequest(BaseModel):
     spot: float = Field(..., gt=0)
     annual_rate: float = Field(0.105)
-    near_du: int = Field(15, gt=0)
-    next_du: int = Field(35, gt=0)
+    # Public API keeps DU names (retrocompatible). Internally they are
+    # converted to CBOE calendar year fractions (see calculate_vixbova).
+    near_du: int = Field(15, gt=0, description="Near-term expiration in business days (DU); converted to calendar/365 internally")
+    next_du: int = Field(35, gt=0, description="Next-term expiration in business days (DU); converted to calendar/365 internally")
+    # Retrocompatible aliases: accept calendar-day inputs under alternative names.
+    near_days: Optional[int] = Field(None, gt=0, description="Alias for near_du (business days)")
+    next_days: Optional[int] = Field(None, gt=0, description="Alias for next_du (business days)")
+
+    def resolved_near_du(self) -> int:
+        return self.near_days if self.near_days is not None else self.near_du
+
+    def resolved_next_du(self) -> int:
+        return self.next_days if self.next_days is not None else self.next_du
 
 
 class GarchRequest(BaseModel):
@@ -86,12 +97,19 @@ def get_greeks(req: B3GreeksRequest):
 def calculate_vixbova(req: VixBovaRequest):
     try:
         from ..connectors.market_data import B3MarketData
-        near_chain = B3MarketData.generate_bova11_chain(req.spot, du_to_expiry=req.near_du, risk_free_rate=req.annual_rate)
-        next_chain = B3MarketData.generate_bova11_chain(req.spot, du_to_expiry=req.next_du, risk_free_rate=req.annual_rate)
+        near_du = req.resolved_near_du()
+        next_du = req.resolved_next_du()
+        near_chain = B3MarketData.generate_bova11_chain(req.spot, du_to_expiry=near_du, risk_free_rate=req.annual_rate)
+        next_chain = B3MarketData.generate_bova11_chain(req.spot, du_to_expiry=next_du, risk_free_rate=req.annual_rate)
 
         r_cont = DICurveInterpolator.from_dict({21: req.annual_rate}).continuous_rate(21)
-        v1 = VixBovaEngine.compute_single_term_variance(near_chain, time_to_exp=req.near_du / 252.0, r=r_cont, business_days=req.near_du)
-        v2 = VixBovaEngine.compute_single_term_variance(next_chain, time_to_exp=req.next_du / 252.0, r=r_cont, business_days=req.next_du)
+        # CBOE calendar base: T = calendar_days/365, with
+        # calendar_days ~= DU * 365/252 (approximation: weekends/holidays).
+        # business_days_to_time_to_expiry() does the two-step conversion
+        # explicitly (numerically == DU/252, but in calendar units so T1/T2
+        # share the base with N30 = 30/365 in calculate_vixbova).
+        v1 = VixBovaEngine.compute_single_term_variance(near_chain, time_to_exp=business_days_to_time_to_expiry(near_du), r=r_cont, business_days=near_du)
+        v2 = VixBovaEngine.compute_single_term_variance(next_chain, time_to_exp=business_days_to_time_to_expiry(next_du), r=r_cont, business_days=next_du)
 
         vix_index = VixBovaEngine.calculate_vixbova(v1, v2)
         return {
@@ -99,8 +117,8 @@ def calculate_vixbova(req: VixBovaRequest):
             "vixbova_index": vix_index,
             "near_term_variance": v1.variance,
             "next_term_variance": v2.variance,
-            "near_du": req.near_du,
-            "next_du": req.next_du
+            "near_du": near_du,
+            "next_du": next_du
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -1,4 +1,15 @@
-"""CBOE VIX Volatility Index Replication Engine tailored for B3 BOVA11 Options."""
+"""CBOE VIX Volatility Index Replication Engine tailored for B3 BOVA11 Options.
+
+Time convention (CBOE, unified):
+    All VIX inputs use CALENDAR time in years: T = calendar_days / 365.
+    The 30-day target is N30 = 30 / 365.
+    When only business days (DU) are known, estimate
+    calendar_days ~= DU * 365/252 and then T = calendar_days / 365
+    (numerically equal to DU/252, but expressed in calendar units so that
+    T1/T2 and N30 share the same base). B3 option *pricing* (Black-Scholes)
+    and DI discounting still use DU/252 internally — only the VIX variance
+    and interpolation use the calendar base.
+"""
 
 from __future__ import annotations
 
@@ -8,13 +19,45 @@ import numpy as np
 import pandas as pd
 
 
+# CBOE calendar convention constants (unified base for the VIX engine).
+CALENDAR_DAYS_PER_YEAR: float = 365.0
+BUSINESS_DAYS_PER_YEAR: float = 252.0
+# Approximation: one DU ~= 365/252 calendar days (weekends/holidays).
+DU_TO_CALENDAR_FACTOR: float = CALENDAR_DAYS_PER_YEAR / BUSINESS_DAYS_PER_YEAR
+
+
+def business_days_to_calendar_days(business_days: float) -> float:
+    """Estimate calendar days from business days (DU).
+
+    Approximation: calendar_days ~= DU * 365/252.
+    """
+    return float(business_days) * DU_TO_CALENDAR_FACTOR
+
+
+def calendar_days_to_time_to_expiry(calendar_days: float) -> float:
+    """Convert calendar days to CBOE year fraction: T = calendar_days / 365."""
+    return float(calendar_days) / CALENDAR_DAYS_PER_YEAR
+
+
+def business_days_to_time_to_expiry(business_days: float) -> float:
+    """Convert DU to CBOE year fraction via explicit calendar step.
+
+    calendar_days ~= DU * 365/252, then T = calendar_days / 365.
+    NOTE: numerically identical to DU/252, but written in two steps so the
+    calendar (CBOE) base shared with N30 = 30/365 is explicit.
+    """
+    calendar_days = business_days_to_calendar_days(business_days)
+    return calendar_days_to_time_to_expiry(calendar_days)
+
+
 @dataclass(frozen=True)
 class TermVariance:
     maturity_du: float
-    time_to_maturity: float
+    time_to_maturity: float  # CBOE calendar year fraction (calendar_days / 365)
     forward_price: float
     atm_strike: float
     variance: float
+    maturity_calendar_days: float = 0.0  # informative estimate (DU * 365/252)
 
 
 class VixBovaEngine:
@@ -27,10 +70,23 @@ class VixBovaEngine:
         time_to_exp: float,
         r: float,
         business_days: float = 21.0,
+        calendar_days: float | None = None,
     ) -> TermVariance:
         """Compute variance for a single expiration term according to CBOE VIX formula.
 
         Expected DataFrame columns: 'strike', 'call_price', 'put_price'
+
+        Time convention (CBOE calendar base):
+            ``time_to_exp`` MUST be a calendar year fraction
+            ``T = calendar_days / 365`` (NOT ``DU/252`` directly).
+            If you only know business days (DU), convert explicitly::
+
+                calendar_days ~= DU * 365/252
+                T = calendar_days / 365   # == DU/252 numerically
+
+            Use :func:`business_days_to_time_to_expiry` for that conversion.
+            ``business_days`` (DU) is kept only as informative metadata;
+            ``calendar_days`` optionally records the calendar estimate.
         """
         if time_to_exp <= 0:
             raise ValueError("Time to expiration must be positive.")
@@ -91,12 +147,14 @@ class VixBovaEngine:
 
         term_variance = (2.0 / time_to_exp) * weighted_sum - (1.0 / time_to_exp) * ((forward / k0 - 1.0) ** 2)
 
+        cal_days = float(calendar_days) if calendar_days is not None else business_days_to_calendar_days(business_days)
         return TermVariance(
             maturity_du=business_days,
             time_to_maturity=time_to_exp,
             forward_price=forward,
             atm_strike=k0,
-            variance=max(0.0, term_variance)
+            variance=max(0.0, term_variance),
+            maturity_calendar_days=cal_days,
         )
 
     @classmethod
@@ -106,7 +164,13 @@ class VixBovaEngine:
         next_term: TermVariance,
         target_days: float = 30.0,
     ) -> float:
-        """Interpolate near-term and next-term variances to target constant 30-day index."""
+        """Interpolate near-term and next-term variances to target constant 30-day index.
+
+        CBOE calendar convention: T1, T2 and N30 share the same base —
+        T1 = cal_days_1/365, T2 = cal_days_2/365, N30 = target_days/365
+        (default target_days=30 -> N30 = 30/365). Do NOT pass DU/252 here;
+        convert DU via ``business_days_to_time_to_expiry`` first.
+        """
         t1 = near_term.time_to_maturity
         t2 = next_term.time_to_maturity
         v1 = near_term.variance

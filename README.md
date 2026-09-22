@@ -9,7 +9,8 @@
 **Volatility Modeling, VIXBOVA Index Replication, and DI1 Yield Curve Engine for Brazilian Equities (B3).**
 
 This repository modernizes legacy options and volatility tracking workbooks (see `excel_legacy/README.md` for provenance) into a modular Python engine tailored to the Brazilian market's unique conventions:
-- **DU-252 Business Day Calendar Basis** (vs 365 calendar days).
+- **DU-252 Business Day Basis for pricing & discounting** ($DF = (1 + R_{\text{DI}})^{-DU/252}$).
+- **CBOE calendar basis for the VIX strip** ($T = \text{calendar days}/365$, $N_{30} = 30/365$) — converted from business days via $DU \times 365/252$.
 - **DI1 Yield Curve Discounting** ($DF = (1 + R_{\text{DI}})^{-DU/252}$).
 - **CBOE VIX Replication on BOVA11 Options** (Discrete variance swap strip).
 - **GARCH(1,1) Volatility Forecasting** via Maximum Likelihood Estimation.
@@ -27,7 +28,7 @@ $$\sigma^2 = \frac{2}{T}\sum_i \frac{\Delta K_i}{K_i^2} e^{RT} Q(K_i) - \frac{1}
 $$\text{VIXBOVA} = 100 \times \sqrt{\sigma_{30\text{d}}^2}$$
 
 Where:
-- $F = K_{\text{min}} + e^{RT}(C_{\text{atm}} - P_{\text{atm}})$ is the forward index level.
+- $F = K_{\text{atm}} + e^{RT}(C_{\text{atm}} - P_{\text{atm}})$ is the forward index level, evaluated at the at-the-money strike (minimum $|C - P|$).
 - $K_0$ is the strike immediately below $F$.
 - $\Delta K_i = \frac{K_{i+1} - K_{i-1}}{2}$ is the discrete strike interval.
 - Linear interpolation across near-term ($T_1$) and next-term ($T_2$) expirations produces the constant 30-day metric.
@@ -98,9 +99,9 @@ Audited source code extracted from the legacy volatility workbook (see `excel_le
 - `BlackScholes_NewtonRaphson.bas`: European option pricing & Newton-Raphson IV solver.
 - `RTD_Formula_Manager.bas`: Dynamic formula rewriting for Nelogica, Tryd, and Fast Trade.
 - `Market_Recorder_AxesScaler.bas`: Dynamic chart axis scaling for `VIXBOVA` and `GFMOVE`.
-- `Data_Scheduler_Cron.bas`: Real-time market tick recorder.
+- `Data_Scheduler_Cron.bas`: Scheduled market tick recorder.
 - `ExportarGrafico_HD.bas`: HD chart image exporter for automated Telegram reports.
-- `Servidor1_RTD_Selector.frm`: UserForm for platform selection (Password: `12345`).
+- `Servidor1_RTD_Selector.frm`: UserForm for platform selection (legacy sheet protection was trivial and has been removed).
 
 ---
 
